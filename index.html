@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أبشر - قراءات الزحام</title>
+    
+    <!-- Google Fonts - Cairo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Onboarding Flow -->
+        <div id="onboarding" class="screen">
+            <div class="onboarding-container">
+                <div class="slider-wrapper">
+                    <div class="slider" id="slider">
+                        <!-- Slide 1 -->
+                        <div class="slide active">
+                            <button class="skip-btn" id="skipBtn">تخطي</button>
+                            <div class="slide-content">
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-clock icon-large"></i>
+                                </div>
+                                <h2>اعرف أفضل وقت للزيارة</h2>
+                                <p>احصل على معلومات دقيقة قبل مغادرة منزلك لتوفير الوقت وتجنب الازدحام</p>
+                            </div>
+                        </div>
+
+                        <!-- Slide 2 -->
+                        <div class="slide">
+                            <button class="skip-btn">تخطي</button>
+                            <div class="slide-content">
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-users icon-large"></i>
+                                </div>
+                                <h2>مستوى الازدحام المباشر والتوقعات الذكية</h2>
+                                <p>شاهد حالة الازدحام الآن وتوقعات ساعات الذروة لأي موقع تريد زيارته</p>
+                            </div>
+                        </div>
+
+                        <!-- Slide 3 -->
+                        <div class="slide">
+                            <button class="skip-btn">تخطي</button>
+                            <div class="slide-content">
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-map-marked-alt icon-large"></i>
+                                </div>
+                                <h2>توافر المواقف والطرق وحالة المرور</h2>
+                                <p>اعرف عدد المواقف المتاحة وحالة الطرق المؤدية للموقع قبل السفر</p>
+                            </div>
+                        </div>
+
+                        <!-- Slide 4 -->
+                        <div class="slide">
+                            <button class="skip-btn">تخطي</button>
+                            <div class="slide-content">
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-bell icon-large"></i>
+                                </div>
+                                <h2>تنبيهات ذكية في الوقت المناسب</h2>
+                                <p>استلم إشعارات عندما يكون الوقت مثالياً للزيارة أو عند اقتراب الذروة</p>
+                                
+                                <div class="notifications-list">
+                                    <div class="notification-item">
+                                        <span class="notification-dot red"></span>
+                                        <span class="notification-text">ازدحام مرتفع متوقع خلال 30 دقيقة</span>
+                                    </div>
+                                    <div class="notification-item">
+                                        <span class="notification-dot orange"></span>
+                                        <span class="notification-text">المواقف قاربت على الامتلاء</span>
+                                    </div>
+                                    <div class="notification-item">
+                                        <span class="notification-dot green"></span>
+                                        <span class="notification-text">أفضل وقت لزيارتك الآن</span>
+                                    </div>
+                                    <div class="notification-item">
+                                        <span class="notification-dot red"></span>
+                                        <span class="notification-text">حادث على الطريق قد يسبب تأخيرا</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="navigation">
+                    <div class="dot-indicators" id="dotIndicators">
+                        <span class="dot active" data-slide="0"></span>
+                        <span class="dot" data-slide="1"></span>
+                        <span class="dot" data-slide="2"></span>
+                        <span class="dot" data-slide="3"></span>
+                    </div>
+                    <button class="next-btn" id="nextBtn">التالي</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auth Screen (Login / Register) -->
+        <div id="auth-screen" class="screen hidden">
+            <div class="auth-wrapper">
+                <div class="auth-card">
+                    <div class="auth-logo">
+                        <div class="auth-logo-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="auth-logo-text">
+                            <div class="auth-logo-title">تسجيل الدخول</div>
+                            <div class="auth-logo-subtitle">دخول أو تسجيل جديد بخطوة واحدة</div>
+                        </div>
+                    </div>
+
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" data-mode="login">تسجيل الدخول</button>
+                        <button class="auth-tab" data-mode="register">إنشاء حساب</button>
+                    </div>
+
+                    <form id="authForm" class="auth-form">
+                        <div class="form-group">
+                            <label for="nationalId">الهوية الوطنية / الإقامة</label>
+                            <input type="text" id="nationalId" name="nationalId" placeholder="رقم الهوية أو الإقامة" required>
+                        </div>
+
+                        <div class="form-group register-only hidden">
+                            <label for="mobile">رقم الجوال</label>
+                            <input type="tel" id="mobile" name="mobile" placeholder="05xxxxxxxx" pattern="05[0-9]{8}">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">كلمة المرور</label>
+                            <input type="password" id="password" name="password" placeholder="••••••••" required>
+                        </div>
+
+                        <div class="form-group register-only hidden">
+                            <label for="confirmPassword">تأكيد كلمة المرور</label>
+                            <input type="password" id="confirmPassword" name="confirmPassword" placeholder="كرر كلمة المرور">
+                        </div>
+
+                        <div class="auth-actions">
+                            <button type="submit" id="authSubmitBtn" class="primary-btn">تسجيل الدخول</button>
+                            <button type="button" id="quickLoginBtn" class="ghost-btn">الدخول عبر النفاذ الوطني</button>
+                        </div>
+
+                        <div class="auth-helper">
+                            <a href="#" id="authForgotPassword">نسيت كلمة المرور؟</a>
+                            <span class="auth-note">حفاظاً على أمانك، لا تشارك بيانات الدخول مع أي شخص.</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App Container -->
+        <div id="main-app" class="screen hidden">
+            <!-- Home Screen -->
+            <div id="home" class="app-screen">
+                <div class="app-header home-header">
+                    <h1 class="home-title">مساعد الحركة الذكي</h1>
+                    <div class="search-bar home-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="اختر موقعك / المبنى الحكومي / الفعالية" id="searchInput">
+                    </div>
+                </div>
+
+                <div class="app-content home-content">
+                    <!-- Quick Stats Grid -->
+                    <div class="section">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon green">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <div class="stat-label">مواقع متاحة</div>
+                                <div class="stat-value green-text">23 موقع</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon green">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="stat-label">أفضل وقت</div>
+                                <div class="stat-value green-text">الآن</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon red">
+                                    <i class="fas fa-bell"></i>
+                                </div>
+                                <div class="stat-label">تنبيهات</div>
+                                <div class="stat-value red-text">3 جديد</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nearby Locations -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">المواقع القريبة</h2>
+                            <button class="link-button" onclick="navigateTo('map-screen')">عرض الخريطة</button>
+                        </div>
+                        <div id="nearbyList" class="nearby-list">
+                            <!-- Dynamic locations will be injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Map Widget -->
+                    <div class="section">
+                        <div class="map-widget">
+                            <div class="map-widget-header">
+                                <h3>الخريطة التفاعلية</h3>
+                                <button class="link-button" onclick="navigateTo('map-screen')">فتح</button>
+                            </div>
+                            <div id="homeMap" class="home-map-preview">
+                                <!-- Mini map will be initialized here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Button -->
+                    <div class="section">
+                        <button class="incident-button">
+                            + إضافة حادث في الطريق
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Screen -->
+            <div id="map-screen" class="app-screen hidden">
+                <div class="map-header">
+                    <button class="back-btn-green" onclick="navigateTo('home')">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <h2>الخريطة المباشرة</h2>
+                    <button class="refresh-btn" onclick="refreshMap()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="map" class="map-container"></div>
+                <div class="map-controls">
+                    <button class="map-control-btn" onclick="openMapSearch()" title="بحث">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="map-control-btn" onclick="openMapFilter()" title="فلتر">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                    <button class="map-control-btn" onclick="zoomInMap()" title="تكبير">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="map-legend">
+                    <h4 class="legend-title">دليل الخريطة</h4>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <span class="legend-dot low"></span>
+                            <span>منخفض</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot medium"></span>
+                            <span>متوسط</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot high"></span>
+                            <span>مرتفع</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot critical"></span>
+                            <span>حرج</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot parking"></span>
+                            <span>مواقف</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot incident"></span>
+                            <span>حادث</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="map-traffic-status">
+                    <div class="traffic-status-header">
+                        <h4>حالة المرور الآن</h4>
+                        <span class="traffic-status-dot medium"></span>
+                    </div>
+                    <p class="traffic-status-text">متوسط في معظم المناطق</p>
+                    <p class="traffic-status-warning">ازدحام شديد قرب البوليفارد</p>
+                </div>
+            </div>
+
+            <!-- Alerts Screen -->
+            <div id="alerts-screen" class="app-screen hidden">
+                <div class="alerts-header">
+                    <a href="#" class="mark-read-link" onclick="markAllAsRead(); return false;">تعليم كمقروء</a>
+                    <h2 class="alerts-page-title">التنبيهات الذكية</h2>
+                </div>
+                <div class="alerts-tabs">
+                    <button class="alert-tab" data-filter="read" onclick="filterAlerts('read')">مقروءة</button>
+                    <button class="alert-tab" data-filter="urgent" onclick="filterAlerts('urgent')">عاجل <span class="tab-count">(2)</span></button>
+                    <button class="alert-tab active" data-filter="all" onclick="filterAlerts('all')">الكل <span class="tab-count">(5)</span></button>
+                </div>
+                <div class="alerts-content">
+                    <div class="alert-settings-card" onclick="openAlertSettings()">
+                        <div class="alert-settings-icon">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="alert-settings-content">
+                            <div class="alert-settings-title">إعدادات التنبيهات</div>
+                            <div class="alert-settings-desc">اضبط تفضيلات الإشعارات الخاصة بك</div>
+                        </div>
+                        <i class="fas fa-chevron-left alert-settings-arrow"></i>
+                    </div>
+                    <div class="alerts-section">
+                        <h3 class="alerts-section-title">اليوم</h3>
+                        <div class="alerts-list" id="alertsList">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Details Screen -->
+            <div id="location-details" class="app-screen hidden">
+                <div class="location-details-header">
+                    <button class="back-btn-green" onclick="navigateTo('home')">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>رجوع</span>
+                    </button>
+                    <div class="location-header-info">
+                        <h2 id="locationName">وزارة الداخلية</h2>
+                        <p class="last-update" id="lastUpdate">آخر تحديث: منذ 3 دقائق</p>
+                    </div>
+                </div>
+                <div class="location-details-content">
+                    <!-- Card 1: Current Congestion Level -->
+                    <div class="congestion-card">
+                        <h3 class="card-title">مستوى الازدحام الحالي</h3>
+                        <div class="congestion-status-text" id="congestionStatusText">متوسط</div>
+                        <div class="donut-chart-container">
+                            <canvas id="donutChart"></canvas>
+                        </div>
+                        <div class="congestion-legend">
+                            <div class="legend-item">
+                                <span class="legend-dot low"></span>
+                                <span>منخفض</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot medium"></span>
+                                <span>متوسط</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot high"></span>
+                                <span>مرتفع</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot critical"></span>
+                                <span>حرج</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Daily Peak Forecast -->
+                    <div class="peak-forecast-card">
+                        <h3 class="card-title">توقعات الذروة اليوم</h3>
+                        <div class="line-chart-container">
+                            <canvas id="peakForecastChart"></canvas>
+                        </div>
+                        <div class="peak-warning" id="peakWarning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span id="peakWarningText">تزداد الذروة بين 4-6 مساءً</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Screen -->
+            <div id="profile-screen" class="app-screen hidden">
+                <div class="app-header">
+                    <h2 class="page-title">الملف الشخصي</h2>
+                </div>
+                <div class="app-content">
+                    <div class="profile-card">
+                        <div class="profile-avatar-large">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <h3 id="profileName">المستخدم</h3>
+                        <p id="profileEmail">user@example.com</p>
+                    </div>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <i class="fas fa-cog"></i>
+                            <span>الإعدادات</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                        <div class="setting-item">
+                            <i class="fas fa-bell"></i>
+                            <span>إعدادات الإشعارات</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                        <div class="setting-item">
+                            <i class="fas fa-info-circle"></i>
+                            <span>حول التطبيق</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                        <div class="setting-item" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>تسجيل الخروج</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incident Report Screen -->
+            <div id="incident-screen" class="app-screen hidden">
+                <div class="incident-header">
+                    <button class="text-link" id="incidentCancelBtn">إلغاء</button>
+                    <h2>إضافة حادث في الطريق</h2>
+                    <p class="incident-subtitle">حدد موقع الحادث</p>
+                </div>
+                <div class="incident-content">
+                    <div class="incident-map-card">
+                        <div class="incident-map-placeholder">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+
+                    <div class="incident-location-card">
+                        <div class="incident-location-row">
+                            <div class="incident-location-icon">
+                                <i class="fas fa-location-arrow"></i>
+                            </div>
+                            <div class="incident-location-text">
+                                <div class="incident-location-label">موقع الحادث</div>
+                                <div class="incident-location-value" id="incidentLocationValue">
+                                    طريق الملك فهد، الرياض
+                                </div>
+                            </div>
+                        </div>
+                        <button class="incident-confirm-btn" id="incidentConfirmBtn">
+                            تأكيد الموقع وإرسال
+                        </button>
+                    </div>
+
+                    <div class="incident-notes-card">
+                        <div class="incident-notes-label">ملاحظات (اختياري)</div>
+                        <textarea id="incidentNotes" class="incident-notes-input" rows="3" placeholder="أضف تفاصيل إضافية..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incident Success Screen -->
+            <div id="incident-success" class="app-screen hidden">
+                <div class="incident-success-content">
+                    <div class="success-icon-wrapper">
+                        <div class="success-icon-circle">
+                            <i class="fas fa-check"></i>
+                        </div>
+                    </div>
+                    <h2 class="success-title">تم الإرسال بنجاح</h2>
+                    <p class="success-subtitle">شكرًا لمساهمتك</p>
+                    <button class="success-btn" id="incidentSuccessBackBtn">
+                        العودة للرئيسية
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-item active" onclick="navigateTo('home')">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </button>
+                <button class="nav-item" onclick="navigateTo('map-screen')">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة</span>
+                </button>
+                <button class="nav-item" onclick="navigateTo('alerts-screen')">
+                    <i class="fas fa-bell"></i>
+                    <span>التنبيهات</span>
+                </button>
+                <button class="nav-item" onclick="navigateTo('profile-screen')">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Toast / Snackbar for تفاعلية الأزرار -->
+        <div id="appToast" class="toast hidden">
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
