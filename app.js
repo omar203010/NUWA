@@ -5,6 +5,7 @@ let currentScreen = 'onboarding';
 let currentSlide = 0;
 const totalSlides = 4;
 let map = null;
+let navigationMap = null;
 let trafficChart = null;
 let donutChart = null;
 let peakForecastChart = null;
@@ -12,6 +13,18 @@ let homeInteractionsBound = false;
 let authMode = 'login';
 let markersMap = {};
 let currentLocationSelected = null;
+let navigationRoute = null;
+let activeNavigationMap = null;
+let navigationSteps = [];
+let currentStepIndex = 0;
+let currentUserPosition = null;
+let navigationDestination = null;
+let navigationInterval = null;
+let navigationProgress = 0;
+let navigationRouteData = null; // holds geometry + steps from OSRM
+let navigationRouteIndex = 0;
+let initialNavigationDistance = 0;
+let navigationTotalDurationSec = 0;
 const USER_STORAGE_KEY = 'user_profile';
 
 // ============================================
@@ -649,15 +662,13 @@ function startNavigationToLocation(location) {
         showToast('لم يتم العثور على معلومات الموقع', 'error');
         return;
     }
-    // Ensure main app and map screen are visible, then focus on location
+    // Open navigation screen
     document.getElementById('onboarding')?.classList.add('hidden');
     document.getElementById('auth-screen')?.classList.add('hidden');
     document.getElementById('main-app')?.classList.remove('hidden');
-    navigateTo('map-screen');
-    setTimeout(() => {
-        initMap();
-        setTimeout(() => focusLocationOnMap(location), 150);
-    }, 100);
+    navigateTo('navigation-screen');
+    // Get user location and show directions
+    getCurrentLocationAndShowDirections(location);
 }
 
 function openLocationWebsite(location) {
@@ -675,6 +686,622 @@ function openLocationWebsite(location) {
     } else {
         showToast('لا يوجد رابط موقع متاح لهذه الجهة', 'info');
     }
+}
+
+// ============================================
+// Navigation & Directions
+// ============================================
+async function getCurrentLocationAndShowDirections(destination) {
+    const useRoute = async (origin) => {
+        try {
+            const routeData = await fetchRouteFromOSRM(origin, destination);
+            navigationRouteData = routeData;
+            initialNavigationDistance = routeData.distanceKm;
+            navigationTotalDurationSec = routeData.durationSec;
+            showDirectionsFromRoute(origin, destination, routeData);
+        } catch (err) {
+            console.error('Failed to fetch route, using straight line fallback', err);
+            showToast('تعذر تحميل المسار، سيتم استخدام خط مستقيم', 'error');
+            const fallbackRoute = buildFallbackRoute(origin, destination);
+            navigationRouteData = fallbackRoute;
+            initialNavigationDistance = fallbackRoute.distanceKm;
+            navigationTotalDurationSec = estimateDurationSeconds(fallbackRoute.distanceKm, destination.traffic);
+            showDirectionsFromRoute(origin, destination, fallbackRoute);
+        }
+    };
+
+    if (!navigator.geolocation) {
+        const mockLocation = { lat: 24.7136, lng: 46.6753 };
+        await useRoute(mockLocation);
+        return;
+    }
+
+    showToast('جاري تحديد موقعك الحالي...', 'info');
+    
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+            await useRoute(userLocation);
+        },
+        async (error) => {
+            console.error('Error getting location:', error);
+            const mockLocation = { lat: 24.7136, lng: 46.6753 };
+            showToast('استخدام موقع تجريبي (مركز الرياض)', 'info');
+            await useRoute(mockLocation);
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+    );
+}
+
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in kilometers
+}
+
+function formatDistance(km) {
+    if (km < 1) {
+        return Math.round(km * 1000) + ' متر';
+    }
+    return km.toFixed(1) + ' كم';
+}
+
+// Fetch driving route using OSRM (OpenStreetMap)
+async function fetchRouteFromOSRM(origin, destination) {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error(`OSRM error: ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data?.routes?.length) {
+        throw new Error('OSRM returned no routes');
+    }
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+    const steps = (route.legs?.[0]?.steps || []).map((step, idx) => {
+        const instructionText = buildInstructionText(step.maneuver, step.name);
+        const icon = mapManeuverToIcon(step.maneuver);
+        const cumDistanceKm = (route.legs[0].steps.slice(0, idx + 1).reduce((sum, s) => sum + (s.distance || 0), 0)) / 1000;
+        return {
+            type: step.maneuver?.type || 'straight',
+            icon,
+            instruction: instructionText,
+            road: step.name || '',
+            distance: formatDistance((step.distance || 0) / 1000),
+            maneuver: step.maneuver?.type || 'straight',
+            distanceKm: (step.distance || 0) / 1000,
+            cumulativeDistance: cumDistanceKm
+        };
+    });
+
+    return {
+        distanceKm: route.distance / 1000,
+        durationSec: route.duration,
+        geometry: coords,
+        steps
+    };
+}
+
+function buildInstructionText(maneuver, roadName) {
+    if (!maneuver) return `استمر على ${roadName || 'الطريق'}`;
+    const { type, modifier } = maneuver;
+    const turnText = mapManeuverToText(type, modifier);
+    if (roadName) {
+        return `${turnText} إلى ${roadName}`;
+    }
+    return turnText;
+}
+
+function mapManeuverToText(type, modifier) {
+    const turns = {
+        right: 'انعطف يميناً',
+        left: 'انعطف يساراً',
+        straight: 'استمر مباشرة',
+        slight_right: 'انعطف ميلاً لليمين',
+        slight_left: 'انعطف ميلاً لليسار',
+        uturn: 'استدر للخلف'
+    };
+    if (type === 'arrive') return 'وصلت إلى وجهتك';
+    if (type === 'depart') return 'ابدأ من موقعك الحالي';
+    if (type === 'turn') {
+        return turns[modifier] || 'انعطف';
+    }
+    if (type === 'roundabout') return 'ادخل الدوار واتبع المخرج المحدد';
+    return 'استمر على الطريق';
+}
+
+function mapManeuverToIcon(maneuver) {
+    if (!maneuver) return 'fa-arrow-up';
+    const { type, modifier } = maneuver;
+    if (type === 'arrive') return 'fa-flag-checkered';
+    if (type === 'depart') return 'fa-map-marker-alt';
+    if (type === 'roundabout') return 'fa-sync-alt';
+    if (type === 'turn') {
+        if (modifier === 'right' || modifier === 'sharp right') return 'fa-arrow-right';
+        if (modifier === 'left' || modifier === 'sharp left') return 'fa-arrow-left';
+        if (modifier === 'slight right') return 'fa-arrow-up-right-from-square';
+        if (modifier === 'slight left') return 'fa-arrow-up-left-from-square';
+    }
+    return 'fa-arrow-up';
+}
+
+function buildFallbackRoute(origin, destination) {
+    const distanceKm = calculateDistance(origin.lat, origin.lng, destination.lat, destination.lng);
+    return {
+        distanceKm,
+        durationSec: estimateDurationSeconds(distanceKm, destination.traffic),
+        geometry: [
+            { lat: origin.lat, lng: origin.lng },
+            { lat: destination.lat, lng: destination.lng }
+        ],
+        steps: [
+            {
+                type: 'depart',
+                icon: 'fa-map-marker-alt',
+                instruction: 'ابدأ من موقعك الحالي',
+                road: '',
+                distance: '0 م',
+                maneuver: 'start',
+                distanceKm: 0,
+                cumulativeDistance: 0
+            },
+            {
+                type: 'arrive',
+                icon: 'fa-flag-checkered',
+                instruction: `وصلت إلى ${destination.name}`,
+                road: '',
+                distance: formatDistance(distanceKm),
+                maneuver: 'arrive',
+                distanceKm,
+                cumulativeDistance: distanceKm
+            }
+        ]
+    };
+}
+
+function estimateDurationSeconds(distanceKm, trafficLevel) {
+    const speeds = {
+        low: 60,
+        medium: 45,
+        high: 30,
+        severe: 20
+    };
+    const avgSpeed = speeds[trafficLevel] || 40;
+    return (distanceKm / avgSpeed) * 3600;
+}
+
+function estimateTravelTime(distanceKm, trafficLevel) {
+    // Average speed based on traffic level (km/h)
+    const speeds = {
+        low: 60,
+        medium: 45,
+        high: 30,
+        severe: 20
+    };
+    const avgSpeed = speeds[trafficLevel] || 40;
+    const timeHours = distanceKm / avgSpeed;
+    const timeMinutes = Math.round(timeHours * 60);
+    
+    if (timeMinutes < 60) {
+        return timeMinutes + ' دقيقة';
+    }
+    const hours = Math.floor(timeMinutes / 60);
+    const minutes = timeMinutes % 60;
+    return minutes > 0 ? `${hours} ساعة و ${minutes} دقيقة` : `${hours} ساعة`;
+}
+
+function formatDurationFromSeconds(seconds) {
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} دقيقة`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours} ساعة و ${mins} دقيقة` : `${hours} ساعة`;
+}
+
+function showDirectionsFromRoute(userLocation, destination, routeData) {
+    // Store for navigation
+    currentUserPosition = { ...userLocation };
+    navigationDestination = destination;
+    navigationRouteData = routeData;
+    initialNavigationDistance = routeData.distanceKm;
+    navigationTotalDurationSec = routeData.durationSec || estimateDurationSeconds(routeData.distanceKm, destination.traffic);
+    
+    // Update distance and time
+    const distanceEl = document.getElementById('navigationDistance');
+    const timeEl = document.getElementById('navigationTime');
+    const destNameEl = document.getElementById('navigationDestinationName');
+    
+    if (distanceEl) {
+        distanceEl.textContent = formatDistance(routeData.distanceKm);
+    }
+    if (timeEl) {
+        timeEl.textContent = navigationTotalDurationSec
+            ? formatDurationFromSeconds(navigationTotalDurationSec)
+            : estimateTravelTime(routeData.distanceKm, destination.traffic);
+    }
+    if (destNameEl) {
+        destNameEl.textContent = destination.name;
+    }
+    
+    // Initialize navigation map
+    initNavigationMapFromRoute(routeData, userLocation, destination);
+    
+    // Generate navigation steps
+    generateNavigationSteps(routeData, destination);
+}
+
+function initNavigationMapFromRoute(routeData, userLocation, destination) {
+    if (!routeData) return;
+    if (navigationMap) {
+        navigationMap.remove();
+        navigationMap = null;
+    }
+    
+    const mapContainer = document.getElementById('navigationMap');
+    if (!mapContainer) return;
+    mapContainer.innerHTML = '';
+    
+    // Center on first coordinate
+    const firstCoord = routeData.geometry?.[0] || userLocation || { lat: 24.7136, lng: 46.6753 };
+    navigationMap = L.map('navigationMap').setView([firstCoord.lat, firstCoord.lng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(navigationMap);
+    
+    // Markers
+    const userIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `
+            <div style="width: 30px; height: 30px; background: #3498db; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <i class="fas fa-map-marker-alt" style="color: white; font-size: 16px;"></i>
+            </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+    });
+    L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+        .addTo(navigationMap)
+        .bindPopup('<b>موقعك الحالي</b>');
+
+    let destIconColor = '#27ae60';
+    if (destination.traffic === 'medium') destIconColor = '#f39c12';
+    else if (destination.traffic === 'high') destIconColor = '#e74c3c';
+    else if (destination.traffic === 'severe') destIconColor = '#c0392b';
+    const destIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `
+            <div style="width: 35px; height: 35px; background: ${destIconColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <i class="fas fa-flag" style="color: white; font-size: 18px;"></i>
+            </div>
+        `,
+        iconSize: [35, 35],
+        iconAnchor: [17, 35]
+    });
+    L.marker([destination.lat, destination.lng], { icon: destIcon })
+        .addTo(navigationMap)
+        .bindPopup(`<b>${destination.name}</b>`);
+    
+    // Route polyline
+    if (routeData.geometry?.length) {
+        navigationRoute = L.polyline(routeData.geometry.map(c => [c.lat, c.lng]), {
+            color: '#3498db',
+            weight: 5,
+            opacity: 0.8
+        }).addTo(navigationMap);
+        navigationMap.fitBounds(navigationRoute.getBounds(), { padding: [50, 50] });
+    }
+}
+
+function generateNavigationSteps(routeData, destination) {
+    const stepsContainer = document.getElementById('navigationSteps');
+    if (!stepsContainer) return;
+    stepsContainer.innerHTML = '';
+
+    const stepsData = (routeData.steps && routeData.steps.length > 0)
+        ? routeData.steps
+        : buildFallbackRoute(currentUserPosition, destination).steps;
+
+    navigationSteps = stepsData;
+
+    stepsData.forEach((step) => {
+        const stepEl = document.createElement('div');
+        stepEl.className = `navigation-step-item ${step.type}`;
+        
+        let iconClass = 'navigation-step-icon';
+        if (step.type === 'start' || step.type === 'depart') iconClass += ' start';
+        else if (step.type === 'arrive') iconClass += ' arrive';
+        else if (step.maneuver === 'turn-right') iconClass += ' turn-right';
+        else if (step.maneuver === 'turn-left') iconClass += ' turn-left';
+        else iconClass += ' straight';
+        
+        stepEl.innerHTML = `
+            <div class="${iconClass}">
+                <i class="fas ${step.icon}"></i>
+            </div>
+            <div class="navigation-step-details">
+                <div class="navigation-step-main">
+                    <span class="navigation-step-maneuver">${step.instruction}</span>
+                    ${step.road ? `<span class="navigation-step-road">على ${step.road}</span>` : ''}
+                </div>
+                <div class="navigation-step-distance">${step.distance}</div>
+            </div>
+        `;
+        stepsContainer.appendChild(stepEl);
+    });
+}
+
+function startNavigation() {
+    if (!navigationRouteData || !navigationRouteData.geometry || navigationRouteData.geometry.length === 0) {
+        showToast('تعذر بدء التنقل لعدم توفر مسار', 'error');
+        return;
+    }
+    if (!currentUserPosition || !navigationDestination) {
+        const destination = window.currentLocationSelected || currentLocationSelected;
+        if (!destination) {
+            showToast('لم يتم العثور على الوجهة', 'error');
+            return;
+        }
+        currentUserPosition = navigationRouteData.geometry[0] || { lat: destination.lat, lng: destination.lng };
+        navigationDestination = destination;
+    }
+
+    // Reset navigation state
+    currentStepIndex = 0;
+    navigationProgress = 0;
+    navigationRouteIndex = 0;
+
+    // Switch to active navigation screen
+    navigateTo('active-navigation-screen');
+
+    // Initialize active navigation map
+    initActiveNavigationMap();
+
+    // Start navigation simulation
+    startNavigationSimulation();
+}
+
+function initActiveNavigationMap() {
+    // Remove existing map if any
+    if (activeNavigationMap) {
+        activeNavigationMap.remove();
+        activeNavigationMap = null;
+    }
+    
+    const mapContainer = document.getElementById('activeNavigationMap');
+    if (!mapContainer || !currentUserPosition || !navigationDestination) return;
+    
+    // Clear container
+    mapContainer.innerHTML = '';
+    
+    // Initialize map centered on user position
+    activeNavigationMap = L.map('activeNavigationMap').setView([currentUserPosition.lat, currentUserPosition.lng], 15);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(activeNavigationMap);
+    
+    // Add user position marker (will be updated)
+    const userIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `
+            <div style="width: 40px; height: 40px; background: #3498db; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                <i class="fas fa-map-marker-alt" style="color: white; font-size: 20px;"></i>
+            </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40]
+    });
+    
+    window.activeNavUserMarker = L.marker([currentUserPosition.lat, currentUserPosition.lng], { icon: userIcon })
+        .addTo(activeNavigationMap);
+    
+    // Add destination marker
+    let destIconColor = '#27ae60';
+    if (navigationDestination.traffic === 'medium') destIconColor = '#f39c12';
+    else if (navigationDestination.traffic === 'high') destIconColor = '#e74c3c';
+    else if (navigationDestination.traffic === 'severe') destIconColor = '#c0392b';
+    
+    const destIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `
+            <div style="width: 45px; height: 45px; background: ${destIconColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                <i class="fas fa-flag" style="color: white; font-size: 22px;"></i>
+            </div>
+        `,
+        iconSize: [45, 45],
+        iconAnchor: [22, 45]
+    });
+    
+    window.activeNavDestMarker = L.marker([navigationDestination.lat, navigationDestination.lng], { icon: destIcon })
+        .addTo(activeNavigationMap);
+    
+    // Draw route line from real geometry if available
+    if (navigationRouteData?.geometry?.length) {
+        window.activeNavRoute = L.polyline(navigationRouteData.geometry.map(c => [c.lat, c.lng]), {
+            color: '#3498db',
+            weight: 6,
+            opacity: 0.8
+        }).addTo(activeNavigationMap);
+    } else {
+        const routeCoordinates = [
+            [currentUserPosition.lat, currentUserPosition.lng],
+            [navigationDestination.lat, navigationDestination.lng]
+        ];
+        window.activeNavRoute = L.polyline(routeCoordinates, {
+            color: '#3498db',
+            weight: 6,
+            opacity: 0.8
+        }).addTo(activeNavigationMap);
+    }
+    
+    // Update UI
+    updateActiveNavigationUI();
+}
+
+function startNavigationSimulation() {
+    if (navigationInterval) {
+        clearInterval(navigationInterval);
+    }
+    
+    if (!navigationRouteData || !navigationRouteData.geometry || navigationRouteData.geometry.length === 0) {
+        showToast('لا يوجد مسار للتنقل', 'error');
+        return;
+    }
+
+    initialNavigationDistance = navigationRouteData.distanceKm || initialNavigationDistance;
+    const coords = navigationRouteData.geometry;
+    navigationRouteIndex = 0;
+
+    // pace in points per tick
+    const stepSize = Math.max(1, Math.floor(coords.length / 120)); // ~60s animation
+
+    navigationInterval = setInterval(() => {
+        navigationRouteIndex = Math.min(navigationRouteIndex + stepSize, coords.length - 1);
+        currentUserPosition = { ...coords[navigationRouteIndex] };
+
+        // Update map marker
+        if (window.activeNavUserMarker) {
+            window.activeNavUserMarker.setLatLng([currentUserPosition.lat, currentUserPosition.lng]);
+            activeNavigationMap.setView([currentUserPosition.lat, currentUserPosition.lng], 15);
+        }
+
+        // Update progress
+        const traveledDistance = initialNavigationDistance * (navigationRouteIndex / (coords.length - 1));
+        navigationProgress = Math.min(100, (traveledDistance / initialNavigationDistance) * 100);
+
+        // Update current step based on progress
+        updateCurrentStep();
+
+        // Update UI
+        updateActiveNavigationUI();
+
+        // Arrived
+        if (navigationRouteIndex >= coords.length - 1) {
+            stopNavigation();
+            showToast(`وصلت إلى ${navigationDestination.name}`, 'success');
+        }
+    }, 500);
+}
+
+function updateCurrentStep() {
+    if (!navigationSteps || navigationSteps.length === 0 || initialNavigationDistance === 0) return;
+
+    const traveledDistance = (navigationProgress / 100) * initialNavigationDistance;
+
+    for (let i = 0; i < navigationSteps.length; i++) {
+        const step = navigationSteps[i];
+        if (traveledDistance >= step.cumulativeDistance || i === navigationSteps.length - 1) {
+            if (currentStepIndex !== i) {
+                currentStepIndex = i;
+                updateActiveNavigationInstruction();
+            }
+            break;
+        }
+    }
+}
+
+function updateActiveNavigationInstruction() {
+    if (!navigationSteps || currentStepIndex >= navigationSteps.length) return;
+    
+    const step = navigationSteps[currentStepIndex];
+    const iconEl = document.getElementById('activeNavIcon');
+    const instructionEl = document.getElementById('activeNavInstruction');
+    const roadEl = document.getElementById('activeNavRoad');
+    const nextDistanceEl = document.getElementById('activeNavNextDistance');
+    
+    if (iconEl) {
+        iconEl.innerHTML = `<i class="fas ${step.icon}"></i>`;
+        iconEl.className = 'active-nav-instruction-icon';
+        if (step.type === 'start') iconEl.classList.add('start');
+        else if (step.type === 'arrive') iconEl.classList.add('arrive');
+        else if (step.maneuver === 'turn-right') iconEl.classList.add('turn-right');
+        else if (step.maneuver === 'turn-left') iconEl.classList.add('turn-left');
+        else iconEl.classList.add('straight');
+    }
+    
+    if (instructionEl) {
+        instructionEl.textContent = step.instruction;
+    }
+    
+    if (roadEl) {
+        roadEl.textContent = step.road ? `على ${step.road}` : '';
+    }
+    
+    // Calculate distance to next step based on route progress
+    const nextStep = navigationSteps[currentStepIndex + 1];
+    const traveledDistance = (navigationProgress / 100) * initialNavigationDistance;
+    const remainingToNext = nextStep ? Math.max(nextStep.cumulativeDistance - traveledDistance, 0) : 0;
+    if (nextDistanceEl) {
+        nextDistanceEl.textContent = nextStep ? formatDistance(remainingToNext) : '0 م';
+    }
+}
+
+function updateActiveNavigationUI() {
+    const remainingDistance = calculateDistance(
+        currentUserPosition.lat,
+        currentUserPosition.lng,
+        navigationDestination.lat,
+        navigationDestination.lng
+    );
+    
+    const timeEl = document.getElementById('activeNavTime');
+    const distanceEl = document.getElementById('activeNavDistance');
+    const totalDistanceEl = document.getElementById('activeNavTotalDistance');
+    const totalTimeEl = document.getElementById('activeNavTotalTime');
+    const progressEl = document.getElementById('activeNavProgress');
+    
+    if (timeEl) {
+        timeEl.textContent = navigationTotalDurationSec
+            ? formatDurationFromSeconds((navigationTotalDurationSec * remainingDistance) / (initialNavigationDistance || 1))
+            : estimateTravelTime(remainingDistance, navigationDestination.traffic);
+    }
+    
+    if (distanceEl) {
+        distanceEl.textContent = formatDistance(remainingDistance);
+    }
+    
+    if (totalDistanceEl) {
+        totalDistanceEl.textContent = formatDistance(initialNavigationDistance);
+    }
+    
+    if (totalTimeEl) {
+        totalTimeEl.textContent = navigationTotalDurationSec
+            ? formatDurationFromSeconds(navigationTotalDurationSec)
+            : estimateTravelTime(initialNavigationDistance, navigationDestination.traffic);
+    }
+    
+    if (progressEl) {
+        progressEl.style.width = `${navigationProgress}%`;
+    }
+}
+
+function stopNavigation() {
+    if (navigationInterval) {
+        clearInterval(navigationInterval);
+        navigationInterval = null;
+    }
+    
+    // Reset state
+    currentStepIndex = 0;
+    navigationProgress = 0;
+    
+    // Go back to location details
+    navigateTo('location-details');
+}
+
+function toggleNavMenu() {
+    showToast('قائمة التنقل قريباً', 'info');
 }
 
 // Mini map in home screen
@@ -1166,4 +1793,7 @@ window.showLocationDetailsFromMap = showLocationDetailsFromMap;
 window.logout = logout;
 window.openLocationWebsite = openLocationWebsite;
 window.startNavigationToLocation = startNavigationToLocation;
+window.startNavigation = startNavigation;
+window.stopNavigation = stopNavigation;
+window.toggleNavMenu = toggleNavMenu;
 

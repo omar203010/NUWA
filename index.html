@@ -390,6 +390,85 @@
                 </div>
             </div>
 
+            <!-- Navigation/Directions Screen -->
+            <div id="navigation-screen" class="app-screen hidden">
+                <div class="navigation-top-bar">
+                    <button class="navigation-back-btn" onclick="navigateTo('location-details')">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <div class="navigation-route-info">
+                        <div class="navigation-route-time" id="navigationTime">--</div>
+                        <div class="navigation-route-distance" id="navigationDistance">--</div>
+                    </div>
+                    <button class="navigation-menu-btn">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+                <div id="navigationMap" class="navigation-map-full">
+                    <!-- Map for navigation will be initialized here -->
+                </div>
+                <div class="navigation-bottom-sheet">
+                    <div class="navigation-sheet-handle"></div>
+                    <div class="navigation-sheet-header">
+                        <div class="navigation-sheet-title">خطوات الاتجاهات</div>
+                        <div class="navigation-sheet-subtitle" id="navigationDestinationName">--</div>
+                    </div>
+                    <div class="navigation-steps-list" id="navigationSteps">
+                        <!-- Navigation steps will be displayed here -->
+                    </div>
+                    <div class="navigation-actions">
+                        <button class="navigation-start-btn" onclick="startNavigation()">
+                            <i class="fas fa-play"></i>
+                            <span>ابدأ التنقل</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Navigation Screen -->
+            <div id="active-navigation-screen" class="app-screen hidden">
+                <div class="active-nav-header">
+                    <button class="active-nav-close-btn" onclick="stopNavigation()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="active-nav-info">
+                        <div class="active-nav-time" id="activeNavTime">--</div>
+                        <div class="active-nav-distance" id="activeNavDistance">--</div>
+                    </div>
+                    <button class="active-nav-menu-btn" onclick="toggleNavMenu()">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+                <div id="activeNavigationMap" class="active-nav-map">
+                    <!-- Active navigation map -->
+                </div>
+                <div class="active-nav-instruction-card">
+                    <div class="active-nav-instruction-icon" id="activeNavIcon">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                    <div class="active-nav-instruction-content">
+                        <div class="active-nav-instruction-text" id="activeNavInstruction">استمر مباشرة</div>
+                        <div class="active-nav-instruction-road" id="activeNavRoad">على طريق الملك فهد</div>
+                    </div>
+                    <div class="active-nav-next-distance" id="activeNavNextDistance">500 م</div>
+                </div>
+                <div class="active-nav-bottom-info">
+                    <div class="active-nav-progress">
+                        <div class="active-nav-progress-bar" id="activeNavProgress"></div>
+                    </div>
+                    <div class="active-nav-stats">
+                        <div class="active-nav-stat">
+                            <i class="fas fa-route"></i>
+                            <span id="activeNavTotalDistance">--</span>
+                        </div>
+                        <div class="active-nav-stat">
+                            <i class="fas fa-clock"></i>
+                            <span id="activeNavTotalTime">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Profile Screen -->
             <div id="profile-screen" class="app-screen hidden">
                 <div class="app-header">
