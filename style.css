@@ -61,8 +61,10 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
-    padding: 16px;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    padding: 12px 16px 8px;
 }
 
 /* ============================================
@@ -83,7 +85,7 @@ body {
     width: 100%;
     overflow: hidden;
     background-color: #ecf0f1;
-    min-height: 500px;
+    min-height: 440px;
     display: flex;              /* لتوسيط الشريحة داخل الإطار */
     align-items: center;        /* المحتوى في منتصف الارتفاع */
 }
@@ -99,12 +101,12 @@ body {
     min-width: 100%;       /* كل شريحة تأخذ عرض الشاشة بالكامل */
     flex-shrink: 0;
     position: relative;
-    padding: 40px 30px;
+    padding: 28px 24px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 500px;
+    min-height: 440px;
     direction: rtl; /* يبقى محتوى الشريحة من اليمين إلى اليسار */
 }
 
@@ -132,7 +134,7 @@ body {
     width: 100%;
     max-width: 320px;          /* عرض ثابت للمحتوى حتى لا يلتصق بالحواف */
     margin: 0 auto;            /* توسيط أفقي داخل الشريحة */
-    padding: 20px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -141,9 +143,9 @@ body {
 }
 
 .icon-wrapper {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 40px;
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -158,7 +160,7 @@ body {
 }
 
 .slide-content h2 {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text-dark);
     margin-bottom: 20px;
@@ -169,7 +171,7 @@ body {
 }
 
 .slide-content p {
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-light);
     line-height: 1.6;
     margin-bottom: 20px;
@@ -226,11 +228,11 @@ body {
 
 .navigation {
     background-color: var(--white);
-    padding: 30px 20px;
+    padding: 18px 20px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 25px;
+    gap: 18px;
 }
 
 .dot-indicators {
@@ -258,8 +260,8 @@ body {
 
 .next-btn {
     width: 100%;
-    max-width: 300px;
-    padding: 16px 32px;
+    max-width: 280px;
+    padding: 14px 28px;
     background-color: var(--primary-green);
     color: white;
     border: none;
@@ -504,6 +506,40 @@ body {
 
 .search-bar input::placeholder {
     color: var(--text-light);
+}
+
+.app-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.brand-logo {
+    width: 64px;
+    height: auto;
+    object-fit: contain;
+}
+
+.brand-logo.small {
+    width: 52px;
+}
+
+.brand-text {
+    text-align: right;
+}
+
+.brand-name {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: 0.5px;
+}
+
+.brand-sub {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* Content */
