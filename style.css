@@ -262,6 +262,10 @@ body {
     width: 100%;
     max-width: 280px;
     padding: 14px 28px;
+    align-self: center;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
     background-color: var(--primary-green);
     color: white;
     border: none;
@@ -277,6 +281,58 @@ body {
     background-color: #229954;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+}
+
+/* Responsive tweaks for onboarding */
+@media (max-width: 480px) {
+    #onboarding {
+        padding: 8px 12px 6px;
+    }
+
+    .onboarding-container {
+        max-width: 340px;
+    }
+
+    .slider-wrapper {
+        min-height: 380px;
+    }
+
+    .slide {
+        padding: 18px 14px 16px;
+        min-height: 380px;
+    }
+
+    .slide-content {
+        padding: 12px 8px;
+    }
+
+    .icon-wrapper {
+        width: 82px;
+        height: 82px;
+        margin: 0 auto 16px;
+    }
+
+    .slide-content h2 {
+        font-size: 19px;
+        margin-bottom: 12px;
+    }
+
+    .slide-content p {
+        font-size: 13px;
+        margin-bottom: 12px;
+    }
+
+    .navigation {
+        padding: 14px 16px 16px;
+        gap: 12px;
+    }
+
+    .next-btn {
+        max-width: 260px;
+        padding: 12px 20px;
+        font-size: 16px;
+        align-self: center;
+    }
 }
 
 /* ============================================
@@ -1454,8 +1510,10 @@ body {
 
 .alert-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
     margin-top: 5px;
 }
 
@@ -1469,6 +1527,10 @@ body {
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
+}
+
+.alert-details-link.start-nav {
+    color: #0f7a3e;
 }
 
 .no-alerts {
@@ -1644,6 +1706,32 @@ body {
     color: var(--alert-red);
     font-size: 14px;
     font-weight: 600;
+}
+
+.location-action {
+    margin: 16px 0 8px;
+    display: flex;
+    justify-content: center;
+}
+
+.location-action-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 14px 18px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: linear-gradient(135deg, var(--primary-green), #229954);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(39, 174, 96, 0.25);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.location-action-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.2);
 }
 
 /* Profile Screen */

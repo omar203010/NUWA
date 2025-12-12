@@ -10,6 +10,8 @@ let donutChart = null;
 let peakForecastChart = null;
 let homeInteractionsBound = false;
 let authMode = 'login';
+let markersMap = {};
+let currentLocationSelected = null;
 const USER_STORAGE_KEY = 'user_profile';
 
 // ============================================
@@ -28,6 +30,7 @@ const locations = [
         arrival: '15 دقيقة',
         lat: 24.7136,
         lng: 46.6753,
+        website: 'https://www.moi.gov.sa',
         popularTimes: [20, 35, 60, 75, 80, 70, 50, 30, 25, 30, 40, 55]
     },
     {
@@ -42,6 +45,7 @@ const locations = [
         arrival: '12 دقيقة',
         lat: 24.7295,
         lng: 46.6400,
+        website: 'https://www.kafd.sa',
         popularTimes: [10, 15, 25, 35, 45, 40, 30, 20, 15, 20, 30, 40]
     },
     {
@@ -56,6 +60,7 @@ const locations = [
         arrival: '25 دقيقة',
         lat: 24.9578,
         lng: 46.6988,
+        website: 'https://www.riyadh-airport.com',
         popularTimes: [25, 40, 65, 80, 90, 85, 70, 50, 35, 45, 60, 75]
     },
     {
@@ -70,6 +75,7 @@ const locations = [
         arrival: '30 دقيقة',
         lat: 24.7510,
         lng: 46.6465,
+        website: 'https://www.riyadhcity.sa',
         popularTimes: [30, 45, 70, 85, 95, 90, 80, 65, 50, 55, 70, 85]
     }
 ];
@@ -504,6 +510,7 @@ function initMap() {
         map.remove();
         map = null;
     }
+    markersMap = {};
 
     map = L.map('map').setView([24.7136, 46.6753], 12);
 
@@ -542,6 +549,7 @@ function initMap() {
         });
 
         const marker = L.marker([location.lat, location.lng], { icon: parkingIcon }).addTo(map);
+        markersMap[location.id] = marker;
         
         marker.bindPopup(`
             <div style="text-align: right; direction: rtl; min-width: 200px;">
@@ -590,7 +598,15 @@ function refreshMap() {
 }
 
 function openMapSearch() {
-    showToast('البحث في الخريطة قريباً', 'info');
+    const query = prompt('أدخل اسم الموقع للبحث', '').trim().toLowerCase();
+    if (!query) return;
+    const location = locations.find(loc => loc.name.toLowerCase().includes(query));
+    if (location) {
+        startNavigationToLocation(location);
+        showToast(`تم العثور على ${location.name}`, 'success');
+    } else {
+        showToast('لم يتم العثور على موقع مطابق', 'error');
+    }
 }
 
 function openMapFilter() {
@@ -607,6 +623,57 @@ function showLocationDetailsFromMap(locationId) {
     const location = locations.find(loc => loc.id === locationId);
     if (location) {
         showLocationDetails(location);
+    }
+}
+
+function focusLocationOnMap(location) {
+    if (!location) return;
+    if (!map) {
+        initMap();
+    }
+    const marker = markersMap[location.id];
+    if (marker) {
+        map.setView([location.lat, location.lng], 14);
+        marker.openPopup();
+    } else {
+        map.setView([location.lat, location.lng], 14);
+    }
+}
+
+function startNavigationToLocation(location) {
+    // If no location provided, try to get from window
+    if (!location) {
+        location = window.currentLocationSelected || currentLocationSelected;
+    }
+    if (!location) {
+        showToast('لم يتم العثور على معلومات الموقع', 'error');
+        return;
+    }
+    // Ensure main app and map screen are visible, then focus on location
+    document.getElementById('onboarding')?.classList.add('hidden');
+    document.getElementById('auth-screen')?.classList.add('hidden');
+    document.getElementById('main-app')?.classList.remove('hidden');
+    navigateTo('map-screen');
+    setTimeout(() => {
+        initMap();
+        setTimeout(() => focusLocationOnMap(location), 150);
+    }, 100);
+}
+
+function openLocationWebsite(location) {
+    if (!location) {
+        // Try to get from window if not provided
+        location = window.currentLocationSelected;
+    }
+    if (!location) {
+        showToast('لم يتم العثور على معلومات الموقع', 'error');
+        return;
+    }
+    if (location.website) {
+        window.open(location.website, '_blank');
+        showToast('جاري فتح موقع الجهة', 'success');
+    } else {
+        showToast('لا يوجد رابط موقع متاح لهذه الجهة', 'info');
     }
 }
 
@@ -758,6 +825,8 @@ function showLocationDetailsFromMap(locationId) {
 // ============================================
 function showLocationDetails(location) {
     navigateTo('location-details');
+    currentLocationSelected = location;
+    window.currentLocationSelected = location;
 
     // Update header
     document.getElementById('locationName').textContent = location.name;
@@ -1006,6 +1075,8 @@ function filterAlerts(filter) {
                 <div class="alert-footer">
                     <span class="alert-time">${alert.time}</span>
                     <a href="#" class="alert-details-link" onclick="event.stopPropagation(); const location = locations.find(loc => loc.name === '${alert.location}'); if(location) showLocationDetails(location); return false;">عرض التفاصيل</a>
+                    <a href="#" class="alert-details-link start-nav" onclick="event.stopPropagation(); const location = locations.find(loc => loc.name === '${alert.location}'); if(location) startNavigationToLocation(location); return false;">ابدأ</a>
+                    <a href="#" class="alert-details-link start-nav" onclick="event.stopPropagation(); const location = locations.find(loc => loc.name === '${alert.location}'); if(location) startNavigationToLocation(location); return false;">انتقال للخريطة</a>
                 </div>
             </div>
         `;
@@ -1093,4 +1164,6 @@ function logout() {
 window.navigateTo = navigateTo;
 window.showLocationDetailsFromMap = showLocationDetailsFromMap;
 window.logout = logout;
+window.openLocationWebsite = openLocationWebsite;
+window.startNavigationToLocation = startNavigationToLocation;
 
